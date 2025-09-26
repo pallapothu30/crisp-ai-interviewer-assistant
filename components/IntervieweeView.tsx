@@ -63,7 +63,6 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
   const [isLoading, setIsLoading] = useState(false);
   const [userInput, setUserInput] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
-  // Fix: The return type of setTimeout in the browser is a number, not NodeJS.Timeout.
   const timerRef = useRef<number | null>(null);
 
   const activeCandidate = appState.candidates.find(c => c.id === appState.activeCandidateId);
@@ -134,27 +133,12 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     setIsLoading(false);
   }, [updateCandidate, setAppState]);
 
-  // Timer logic
-  useEffect(() => {
-    if (timeLeft > 0) {
-      timerRef.current = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-    } else if (timeLeft === 0 && activeCandidate?.status === 'InProgress') {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      const currentQuestion = activeCandidate.questions[activeCandidate.currentQuestionIndex];
-      if (currentQuestion && currentQuestion.answer === '') { // Auto-submit if time runs out
-          handleSubmit(new Event('submit'));
-      }
-    }
-    return () => { if (timerRef.current) clearTimeout(timerRef.current) };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, activeCandidate?.status]);
-
-  const handleSubmit = async (e: React.FormEvent | Event) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent | Event) => {
     e.preventDefault();
     if (!activeCandidate || (userInput.trim() === '' && activeCandidate.status !== 'InProgress')) return;
     if(timerRef.current) clearTimeout(timerRef.current);
 
-    const updatedCandidate = { ...activeCandidate };
+    const updatedCandidate = JSON.parse(JSON.stringify(activeCandidate));
     let newMessages: Message[] = [];
 
     // Handle collecting missing info
@@ -197,8 +181,78 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     updatedCandidate.chatHistory = [...updatedCandidate.chatHistory, ...newMessages];
     updateCandidate(updatedCandidate);
     await handleNextAction(updatedCandidate);
-  };
+  }, [activeCandidate, userInput, handleNextAction, updateCandidate]);
+
+  // Timer logic
+  useEffect(() => {
+    if (timeLeft > 0) {
+      timerRef.current = window.setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+    } else if (timeLeft === 0 && activeCandidate?.status === 'InProgress') {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      const currentQuestion = activeCandidate.questions[activeCandidate.currentQuestionIndex];
+      if (currentQuestion && currentQuestion.answer === '') { // Auto-submit if time runs out
+          handleSubmit(new Event('submit'));
+      }
+    }
+    return () => { if (timerRef.current) clearTimeout(timerRef.current) };
+  }, [timeLeft, activeCandidate, handleSubmit]);
   
+  const processResumeText = async (text: string) => {
+    setIsLoading(true);
+    const { name, email, phone } = await extractInfoFromResume(text);
+    
+    let finalCandidate: Candidate = {
+        id: `cand_${Date.now()}`,
+        name, email, phone,
+        resumeText: text,
+        status: 'InfoCollected',
+        questions: [],
+        currentQuestionIndex: 0,
+        finalScore: null,
+        summary: '',
+        chatHistory: [{ id: Date.now().toString(), sender: 'ai', text: `Hello! I've processed your resume. Let's confirm your details.` }]
+    };
+    
+    let newMessages: Message[] = [];
+
+    const missingFields: string[] = [];
+    if (!finalCandidate.name) missingFields.push('name');
+    if (!finalCandidate.email) missingFields.push('email');
+    if (!finalCandidate.phone) missingFields.push('phone');
+
+    if (missingFields.length > 0) {
+        newMessages.push({ id: Date.now().toString() + 'q', sender: 'ai', text: `Thanks. I see we're missing your ${missingFields.join(', ')}. What is your ${missingFields[0]}?`, isInfo: true });
+    } else {
+        newMessages.push({ id: Date.now().toString() + 'q', sender: 'ai', text: "Great, I have all your information. We'll now begin the interview. You'll have a specific time for each question.", isInfo: true });
+        finalCandidate.status = 'InProgress';
+    }
+    
+    if (finalCandidate.status === 'InProgress') {
+        const { currentQuestionIndex } = finalCandidate;
+        if (currentQuestionIndex < TOTAL_QUESTIONS) {
+            const { difficulty, time } = INTERVIEW_FLOW[currentQuestionIndex];
+            const existingQuestionTexts = finalCandidate.questions.map(q => q.text);
+            const questionText = await generateQuestion(difficulty, existingQuestionTexts);
+            
+            const newQuestion: Question = { id: Date.now().toString() + 'qn', text: questionText, difficulty, time, answer: '', score: null, feedback: '' };
+            finalCandidate.questions.push(newQuestion);
+
+            newMessages.push({ id: Date.now().toString() + 'qn_text', sender: 'ai', text: `Question ${currentQuestionIndex + 1}/${TOTAL_QUESTIONS} (${difficulty}):\n\n${questionText}` });
+            setTimeLeft(time);
+        }
+    }
+
+    finalCandidate.chatHistory = [...finalCandidate.chatHistory, ...newMessages];
+
+    setAppState(prev => ({
+        ...prev,
+        candidates: [...prev.candidates, finalCandidate],
+        activeCandidateId: finalCandidate.id
+    }));
+    
+    setIsLoading(false);
+};
+
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
     let text = '';
@@ -206,49 +260,37 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
 
     if (file.type === 'application/pdf') {
         reader.onload = async (e) => {
-            const data = new Uint8Array(e.target?.result as ArrayBuffer);
-            const pdf = await pdfjsLib.getDocument({ data }).promise;
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                text += content.items.map((item: any) => item.str).join(' ');
+            try {
+              const data = new Uint8Array(e.target?.result as ArrayBuffer);
+              const pdf = await pdfjsLib.getDocument({ data }).promise;
+              for (let i = 1; i <= pdf.numPages; i++) {
+                  const page = await pdf.getPage(i);
+                  const content = await page.getTextContent();
+                  text += content.items.map((item: any) => item.str).join(' ');
+              }
+              await processResumeText(text);
+            } catch (error) {
+              console.error("Error processing PDF:", error);
+              setIsLoading(false);
             }
-            await processResumeText(text);
         };
         reader.readAsArrayBuffer(file);
     } else { // DOCX
         reader.onload = async (e) => {
-            const arrayBuffer = e.target?.result as ArrayBuffer;
-            const result = await mammoth.extractRawText({ arrayBuffer });
-            text = result.value;
-            await processResumeText(text);
+            try {
+              const arrayBuffer = e.target?.result as ArrayBuffer;
+              const result = await mammoth.extractRawText({ arrayBuffer });
+              text = result.value;
+              await processResumeText(text);
+            } catch(error) {
+              console.error("Error processing DOCX:", error);
+              setIsLoading(false);
+            }
         };
         reader.readAsArrayBuffer(file);
     }
   };
   
-  const processResumeText = async (text: string) => {
-      const { name, email, phone } = await extractInfoFromResume(text);
-      const newCandidate: Candidate = {
-          id: `cand_${Date.now()}`,
-          name, email, phone,
-          resumeText: text,
-          status: 'InfoCollected',
-          questions: [],
-          currentQuestionIndex: 0,
-          finalScore: null,
-          summary: '',
-          chatHistory: [{ id: Date.now().toString(), sender: 'ai', text: `Hello! I've processed your resume. Let's confirm your details.` }]
-      };
-      setAppState(prev => ({
-          ...prev,
-          candidates: [...prev.candidates, newCandidate],
-          activeCandidateId: newCandidate.id
-      }));
-      await handleNextAction(newCandidate);
-      setIsLoading(false);
-  };
-
   if (!activeCandidate) {
     return <div className="p-4"><ResumeUpload onUpload={handleFileUpload} loading={isLoading} /></div>;
   }
