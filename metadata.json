@@ -1,0 +1,5 @@
+{
+  "name": "Crisp: AI Interview Assistant",
+  "description": "An AI-powered interview assistant that facilitates a timed, chat-based interview for candidates and provides a detailed dashboard with scores and summaries for interviewers. All data is persisted locally.",
+  "requestFramePermissions": []
+}
