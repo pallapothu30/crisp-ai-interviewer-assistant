@@ -133,11 +133,6 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
                 candidates: prev.candidates.map(c => c.id === updatedCandidate.id ? updatedCandidate : c),
             }));
             
-            // After a delay, return to the welcome screen.
-            setTimeout(() => {
-                setAppState(prev => ({ ...prev, activeCandidateId: null }));
-            }, 8000);
-            
             setIsLoading(false);
             return;
         }
@@ -338,20 +333,32 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
       </div>
 
       <div className="p-4 border-t border-slate-700">
-        <form onSubmit={handleSubmit} className="flex items-center gap-3">
-          <input
-            type="text"
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            placeholder={activeCandidate.status === 'Completed' ? 'Interview has ended.' : 'Type your answer...'}
-            className="flex-1 bg-slate-700 border border-slate-600 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-white disabled:opacity-50"
-            disabled={isLoading || activeCandidate.status === 'Completed'}
-          />
-          {isInterviewInProgress && <Timer timeLeft={timeLeft} questionTime={currentQuestionTime} />}
-          <button type="submit" className="bg-indigo-600 p-2 rounded-lg text-white hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed" disabled={isLoading || userInput.trim() === '' || activeCandidate.status === 'Completed'}>
-            <SendIcon className="w-5 h-5" />
-          </button>
-        </form>
+        {activeCandidate.status === 'Completed' ? (
+            <div className="text-center">
+                <p className="text-slate-400 mb-4">The interview has ended. You can start a new one or view results in the Interviewer tab.</p>
+                <button 
+                    onClick={() => setAppState(prev => ({ ...prev, activeCandidateId: null }))} 
+                    className="bg-indigo-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-indigo-700 transition-colors"
+                >
+                    Start New Interview
+                </button>
+            </div>
+        ) : (
+            <form onSubmit={handleSubmit} className="flex items-center gap-3">
+              <input
+                type="text"
+                value={userInput}
+                onChange={(e) => setUserInput(e.target.value)}
+                placeholder="Type your answer..."
+                className="flex-1 bg-slate-700 border border-slate-600 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-white disabled:opacity-50"
+                disabled={isLoading}
+              />
+              {isInterviewInProgress && <Timer timeLeft={timeLeft} questionTime={currentQuestionTime} />}
+              <button type="submit" className="bg-indigo-600 p-2 rounded-lg text-white hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed" disabled={isLoading || userInput.trim() === ''}>
+                <SendIcon className="w-5 h-5" />
+              </button>
+            </form>
+        )}
       </div>
     </div>
   );
