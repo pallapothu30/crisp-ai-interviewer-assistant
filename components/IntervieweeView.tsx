@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { AppState, Candidate, Message, Question } from '../types';
 import { BotIcon, PersonIcon, SendIcon, UploadIcon } from './shared/Icons';
@@ -113,7 +112,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
             setTimeLeft(time);
         } else {
             updatedCandidate.status = 'Completed';
-            const thinkingMessage: Message = { id: Date.now().toString(), sender: 'ai', text: "Thank you for completing the interview. I'm now calculating your final score and generating a summary. One moment...", isInfo: true };
+            const thinkingMessage: Message = { id: 'thinking-msg', sender: 'ai', text: "Thank you for completing the interview. I'm now calculating your final score and generating a summary. One moment...", isInfo: true };
             
             updatedCandidate.chatHistory = [...updatedCandidate.chatHistory, thinkingMessage];
             updateCandidate(updatedCandidate);
@@ -123,8 +122,11 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
             updatedCandidate.summary = await summarizeInterview(updatedCandidate.name || 'Candidate', updatedCandidate.questions);
             
             const finalMessage: Message = { id: Date.now().toString() + '-final', sender: 'ai', text: `**Interview Complete!**\n\n**Final Score:** ${updatedCandidate.finalScore}%\n\n**Summary:**\n${updatedCandidate.summary}`, isInfo: true };
-            updatedCandidate.chatHistory = [...updatedCandidate.chatHistory, finalMessage];
             
+            const finalChatHistory = updatedCandidate.chatHistory.filter(msg => msg.id !== 'thinking-msg');
+            finalChatHistory.push(finalMessage);
+            updatedCandidate.chatHistory = finalChatHistory;
+
             // Perform the final state update for the candidate.
             setAppState(prev => ({
                 ...prev,

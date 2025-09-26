@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Difficulty, Question, Message } from '../types';
 
@@ -66,7 +65,7 @@ export const evaluateAnswer = async (question: string, answer: string): Promise<
     });
     const jsonText = response.text.trim();
     return JSON.parse(jsonText);
-  } catch (error)
+  } catch (error) {
     console.error("Error evaluating answer:", error);
     return { score: 0, feedback: "AI evaluation failed." };
   }
