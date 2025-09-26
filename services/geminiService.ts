@@ -2,14 +2,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Difficulty, Question, Message } from '../types';
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  // This is a fallback for development. In a real environment, the key should be set.
-  console.warn("API_KEY environment variable not set. Using a placeholder. AI features will not work.");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY || "YOUR_API_KEY_HERE" });
+// Fix: Initialize the GoogleGenAI client directly with the API key from environment variables,
+// assuming it is always present as per the guidelines. Removed fallback logic.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
 export const extractInfoFromResume = async (resumeText: string): Promise<{ name: string | null; email: string | null; phone: string | null }> => {
   try {
@@ -71,7 +66,7 @@ export const evaluateAnswer = async (question: string, answer: string): Promise<
     });
     const jsonText = response.text.trim();
     return JSON.parse(jsonText);
-  } catch (error) {
+  } catch (error)
     console.error("Error evaluating answer:", error);
     return { score: 0, feedback: "AI evaluation failed." };
   }

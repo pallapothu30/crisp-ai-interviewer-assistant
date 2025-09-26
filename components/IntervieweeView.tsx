@@ -45,9 +45,9 @@ const ResumeUpload: React.FC<{ onUpload: (file: File) => void, loading: boolean 
   );
 };
 
-const Timer: React.FC<{ timeLeft: number }> = ({ timeLeft }) => {
-    const progress = (timeLeft / 20) * 100; // Assuming max time is dynamic, need to pass it
-    const strokeColor = timeLeft > 10 ? 'text-green-500' : timeLeft > 5 ? 'text-yellow-500' : 'text-red-500';
+const Timer: React.FC<{ timeLeft: number; questionTime: number }> = ({ timeLeft, questionTime }) => {
+    const progress = (timeLeft / questionTime) * 100;
+    const strokeColor = timeLeft > questionTime * 0.5 ? 'text-green-500' : timeLeft > questionTime * 0.25 ? 'text-yellow-500' : 'text-red-500';
     return (
         <div className="flex items-center space-x-2 text-sm font-mono">
             <svg className="w-6 h-6 transform -rotate-90" viewBox="0 0 24 24">
@@ -85,7 +85,6 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     let updatedCandidate = { ...candidate };
     let newMessages: Message[] = [];
 
-    // Step 1: Check for missing info
     if (updatedCandidate.status === 'InfoCollected') {
         const missingFields: string[] = [];
         if (!updatedCandidate.name) missingFields.push('name');
@@ -100,7 +99,6 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
         }
     }
 
-    // Step 2: Handle interview in progress
     if (updatedCandidate.status === 'InProgress') {
         const { currentQuestionIndex } = updatedCandidate;
         if (currentQuestionIndex < TOTAL_QUESTIONS) {
@@ -114,17 +112,32 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
             newMessages.push({ id: Date.now().toString(), sender: 'ai', text: `Question ${currentQuestionIndex + 1}/${TOTAL_QUESTIONS} (${difficulty}):\n\n${questionText}` });
             setTimeLeft(time);
         } else {
-            // Interview finished
             updatedCandidate.status = 'Completed';
-            newMessages.push({ id: Date.now().toString(), sender: 'ai', text: "Thank you for completing the interview. I'm now calculating your final score and generating a summary. One moment...", isInfo: true });
+            const thinkingMessage: Message = { id: Date.now().toString(), sender: 'ai', text: "Thank you for completing the interview. I'm now calculating your final score and generating a summary. One moment...", isInfo: true };
             
-            // Calculate score and summary
+            updatedCandidate.chatHistory = [...updatedCandidate.chatHistory, thinkingMessage];
+            updateCandidate(updatedCandidate);
+
             const totalScore = updatedCandidate.questions.reduce((acc, q) => acc + (q.score || 0), 0);
             updatedCandidate.finalScore = Math.round(totalScore / TOTAL_QUESTIONS);
             updatedCandidate.summary = await summarizeInterview(updatedCandidate.name || 'Candidate', updatedCandidate.questions);
             
-            newMessages.push({ id: Date.now().toString(), sender: 'ai', text: `**Interview Complete!**\n\n**Final Score:** ${updatedCandidate.finalScore}%\n\n**Summary:**\n${updatedCandidate.summary}`, isInfo: true });
-            setAppState(prev => ({ ...prev, activeCandidateId: null })); // Go back to start screen for next candidate
+            const finalMessage: Message = { id: Date.now().toString() + '-final', sender: 'ai', text: `**Interview Complete!**\n\n**Final Score:** ${updatedCandidate.finalScore}%\n\n**Summary:**\n${updatedCandidate.summary}`, isInfo: true };
+            updatedCandidate.chatHistory = [...updatedCandidate.chatHistory, finalMessage];
+            
+            // Perform the final state update for the candidate.
+            setAppState(prev => ({
+                ...prev,
+                candidates: prev.candidates.map(c => c.id === updatedCandidate.id ? updatedCandidate : c),
+            }));
+            
+            // After a delay, return to the welcome screen.
+            setTimeout(() => {
+                setAppState(prev => ({ ...prev, activeCandidateId: null }));
+            }, 8000);
+            
+            setIsLoading(false);
+            return;
         }
     }
     
@@ -136,12 +149,15 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
   const handleSubmit = useCallback(async (e: React.FormEvent | Event) => {
     e.preventDefault();
     if (!activeCandidate || (userInput.trim() === '' && activeCandidate.status !== 'InProgress')) return;
-    if(timerRef.current) clearTimeout(timerRef.current);
+    if (timerRef.current) clearTimeout(timerRef.current);
 
-    const updatedCandidate = JSON.parse(JSON.stringify(activeCandidate));
-    let newMessages: Message[] = [];
+    setIsLoading(true);
+    // Fix: Using JSON.parse(JSON.stringify(...)) for a deep clone loses specific type information,
+    // like the 'ai' | 'user' union for the sender property, which TypeScript then infers as a generic string.
+    // By explicitly casting the result back to `Candidate`, we restore this type information and
+    // prevent downstream type errors when manipulating the chat history.
+    const updatedCandidate: Candidate = JSON.parse(JSON.stringify(activeCandidate));
 
-    // Handle collecting missing info
     if (updatedCandidate.status === 'InfoCollected') {
         const missingFields: string[] = [];
         if (!updatedCandidate.name) missingFields.push('name');
@@ -151,44 +167,37 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
         if (missingFields.length > 0) {
             const fieldToUpdate = missingFields[0] as keyof Candidate;
             (updatedCandidate[fieldToUpdate] as any) = userInput;
-            newMessages.push({ id: Date.now().toString(), sender: 'user', text: userInput });
         }
-    }
-
-    // Handle interview question answer
-    if (updatedCandidate.status === 'InProgress') {
+        updatedCandidate.chatHistory.push({ id: Date.now().toString(), sender: 'user', text: userInput });
+    } else if (updatedCandidate.status === 'InProgress') {
         const currentQuestionIndex = updatedCandidate.currentQuestionIndex;
         const currentQuestion = updatedCandidate.questions[currentQuestionIndex];
         
-        newMessages.push({ id: Date.now().toString(), sender: 'user', text: userInput });
+        updatedCandidate.chatHistory.push({ id: Date.now().toString(), sender: 'user', text: userInput });
         currentQuestion.answer = userInput;
         
-        setIsLoading(true);
-        newMessages.push({ id: Date.now().toString() + "-loader", sender: 'ai', text: "Evaluating...", isInfo: true });
-        updatedCandidate.chatHistory = [...updatedCandidate.chatHistory, ...newMessages];
+        const loaderMessage = { id: Date.now().toString() + "-loader", sender: 'ai' as const, text: "Evaluating...", isInfo: true };
+        updatedCandidate.chatHistory.push(loaderMessage);
         updateCandidate(updatedCandidate);
         
         const { score, feedback } = await evaluateAnswer(currentQuestion.text, userInput);
         currentQuestion.score = score;
         currentQuestion.feedback = feedback;
-
         updatedCandidate.currentQuestionIndex += 1;
-        updatedCandidate.chatHistory = updatedCandidate.chatHistory.slice(0, -1); // remove loader message
-        newMessages = [{ id: Date.now().toString(), sender: 'ai', text: `**Score:** ${score}/100\n**Feedback:** ${feedback}`, isInfo: true }];
+        updatedCandidate.chatHistory.pop(); // remove loader message
+        
+        updatedCandidate.chatHistory.push({ id: Date.now().toString(), sender: 'ai', text: `**Score:** ${score}/100\n**Feedback:** ${feedback}`, isInfo: true });
     }
 
     setUserInput('');
-    updatedCandidate.chatHistory = [...updatedCandidate.chatHistory, ...newMessages];
-    updateCandidate(updatedCandidate);
     await handleNextAction(updatedCandidate);
   }, [activeCandidate, userInput, handleNextAction, updateCandidate]);
 
   // Timer logic
   useEffect(() => {
-    if (timeLeft > 0) {
+    if (timeLeft > 0 && activeCandidate?.status === 'InProgress') {
       timerRef.current = window.setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
     } else if (timeLeft === 0 && activeCandidate?.status === 'InProgress') {
-      if (timerRef.current) clearTimeout(timerRef.current);
       const currentQuestion = activeCandidate.questions[activeCandidate.currentQuestionIndex];
       if (currentQuestion && currentQuestion.answer === '') { // Auto-submit if time runs out
           handleSubmit(new Event('submit'));
@@ -201,7 +210,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     setIsLoading(true);
     const { name, email, phone } = await extractInfoFromResume(text);
     
-    let finalCandidate: Candidate = {
+    let newCandidate: Candidate = {
         id: `cand_${Date.now()}`,
         name, email, phone,
         resumeText: text,
@@ -214,40 +223,33 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     };
     
     let newMessages: Message[] = [];
-
     const missingFields: string[] = [];
-    if (!finalCandidate.name) missingFields.push('name');
-    if (!finalCandidate.email) missingFields.push('email');
-    if (!finalCandidate.phone) missingFields.push('phone');
+    if (!newCandidate.name) missingFields.push('name');
+    if (!newCandidate.email) missingFields.push('email');
+    if (!newCandidate.phone) missingFields.push('phone');
 
     if (missingFields.length > 0) {
-        newMessages.push({ id: Date.now().toString() + 'q', sender: 'ai', text: `Thanks. I see we're missing your ${missingFields.join(', ')}. What is your ${missingFields[0]}?`, isInfo: true });
+        newMessages.push({ id: Date.now().toString() + '_q', sender: 'ai', text: `Thanks. I see we're missing your ${missingFields.join(', ')}. What is your ${missingFields[0]}?`, isInfo: true });
     } else {
-        newMessages.push({ id: Date.now().toString() + 'q', sender: 'ai', text: "Great, I have all your information. We'll now begin the interview. You'll have a specific time for each question.", isInfo: true });
-        finalCandidate.status = 'InProgress';
+        newMessages.push({ id: Date.now().toString() + '_q', sender: 'ai', text: "Great, I have all your information. We'll now begin the interview. You'll have a specific time for each question.", isInfo: true });
+        newCandidate.status = 'InProgress';
     }
     
-    if (finalCandidate.status === 'InProgress') {
-        const { currentQuestionIndex } = finalCandidate;
-        if (currentQuestionIndex < TOTAL_QUESTIONS) {
-            const { difficulty, time } = INTERVIEW_FLOW[currentQuestionIndex];
-            const existingQuestionTexts = finalCandidate.questions.map(q => q.text);
-            const questionText = await generateQuestion(difficulty, existingQuestionTexts);
-            
-            const newQuestion: Question = { id: Date.now().toString() + 'qn', text: questionText, difficulty, time, answer: '', score: null, feedback: '' };
-            finalCandidate.questions.push(newQuestion);
-
-            newMessages.push({ id: Date.now().toString() + 'qn_text', sender: 'ai', text: `Question ${currentQuestionIndex + 1}/${TOTAL_QUESTIONS} (${difficulty}):\n\n${questionText}` });
-            setTimeLeft(time);
-        }
+    if (newCandidate.status === 'InProgress') {
+        const { difficulty, time } = INTERVIEW_FLOW[0];
+        const questionText = await generateQuestion(difficulty, []);
+        const newQuestion: Question = { id: Date.now().toString() + '_qn', text: questionText, difficulty, time, answer: '', score: null, feedback: '' };
+        newCandidate.questions.push(newQuestion);
+        newMessages.push({ id: Date.now().toString() + '_qn_text', sender: 'ai', text: `Question 1/${TOTAL_QUESTIONS} (${difficulty}):\n\n${questionText}` });
+        setTimeLeft(time);
     }
 
-    finalCandidate.chatHistory = [...finalCandidate.chatHistory, ...newMessages];
+    newCandidate.chatHistory.push(...newMessages);
 
     setAppState(prev => ({
         ...prev,
-        candidates: [...prev.candidates, finalCandidate],
-        activeCandidateId: finalCandidate.id
+        candidates: [...prev.candidates, newCandidate],
+        activeCandidateId: newCandidate.id
     }));
     
     setIsLoading(false);
@@ -258,17 +260,27 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     let text = '';
     const reader = new FileReader();
 
+    const processFileText = async (fileText: string) => {
+        try {
+            await processResumeText(fileText);
+        } catch (error) {
+            console.error("Error processing resume text:", error);
+            setIsLoading(false);
+        }
+    }
+
     if (file.type === 'application/pdf') {
         reader.onload = async (e) => {
             try {
               const data = new Uint8Array(e.target?.result as ArrayBuffer);
               const pdf = await pdfjsLib.getDocument({ data }).promise;
+              let pdfText = '';
               for (let i = 1; i <= pdf.numPages; i++) {
                   const page = await pdf.getPage(i);
                   const content = await page.getTextContent();
-                  text += content.items.map((item: any) => item.str).join(' ');
+                  pdfText += content.items.map((item: any) => item.str).join(' ');
               }
-              await processResumeText(text);
+              await processFileText(pdfText);
             } catch (error) {
               console.error("Error processing PDF:", error);
               setIsLoading(false);
@@ -280,8 +292,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
             try {
               const arrayBuffer = e.target?.result as ArrayBuffer;
               const result = await mammoth.extractRawText({ arrayBuffer });
-              text = result.value;
-              await processResumeText(text);
+              await processFileText(result.value);
             } catch(error) {
               console.error("Error processing DOCX:", error);
               setIsLoading(false);
@@ -296,6 +307,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
   }
 
   const isInterviewInProgress = activeCandidate.status === 'InProgress' && activeCandidate.currentQuestionIndex < TOTAL_QUESTIONS;
+  const currentQuestionTime = isInterviewInProgress ? activeCandidate.questions[activeCandidate.currentQuestionIndex]?.time : 0;
 
   return (
     <div className="flex flex-col h-full bg-slate-800 rounded-lg shadow-xl">
@@ -305,14 +317,14 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
             {msg.sender === 'ai' && <BotIcon className="w-8 h-8 p-1.5 bg-indigo-600 text-white rounded-full flex-shrink-0" />}
             <div className={`max-w-md p-3 rounded-lg ${msg.sender === 'user' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-200'} whitespace-pre-wrap`}>
                 {msg.text.includes('**') ? 
-                  <div dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }} /> : 
+                  <div dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />') }} /> : 
                   msg.text
                 }
             </div>
             {msg.sender === 'user' && <PersonIcon className="w-8 h-8 p-1.5 bg-sky-600 text-white rounded-full flex-shrink-0" />}
           </div>
         ))}
-        {isLoading && (
+        {isLoading && activeCandidate.status !== 'Completed' && (
             <div className="flex items-start gap-3 my-4">
                 <BotIcon className="w-8 h-8 p-1.5 bg-indigo-600 text-white rounded-full" />
                 <div className="max-w-md p-3 rounded-lg bg-slate-700">
@@ -329,12 +341,12 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
             type="text"
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
-            placeholder="Type your answer..."
+            placeholder={activeCandidate.status === 'Completed' ? 'Interview has ended.' : 'Type your answer...'}
             className="flex-1 bg-slate-700 border border-slate-600 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-white disabled:opacity-50"
             disabled={isLoading || activeCandidate.status === 'Completed'}
           />
-          {isInterviewInProgress && <Timer timeLeft={timeLeft} />}
-          <button type="submit" className="bg-indigo-600 p-2 rounded-lg text-white hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed" disabled={isLoading || userInput.trim() === ''}>
+          {isInterviewInProgress && <Timer timeLeft={timeLeft} questionTime={currentQuestionTime} />}
+          <button type="submit" className="bg-indigo-600 p-2 rounded-lg text-white hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed" disabled={isLoading || userInput.trim() === '' || activeCandidate.status === 'Completed'}>
             <SendIcon className="w-5 h-5" />
           </button>
         </form>
