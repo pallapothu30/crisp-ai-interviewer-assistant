@@ -35,7 +35,7 @@ const ResumeUpload: React.FC<{ onUpload: (file: File) => void, loading: boolean 
       <h3 className="mt-2 text-lg font-medium text-gray-900">Upload your resume</h3>
       <p className="mt-1 text-sm text-gray-500">PDF or DOCX accepted</p>
       <div className="mt-4">
-        <label htmlFor="file-upload" className="cursor-pointer bg-[#00B0FF] text-white font-semibold py-2 px-4 rounded-md hover:bg-[#0099E6] transition-colors">
+        <label htmlFor="file-upload" className="cursor-pointer bg-[#4285F4] text-white font-semibold py-2 px-4 rounded-md hover:bg-[#357ABD] transition-colors">
           {loading ? 'Processing...' : 'Select File'}
         </label>
         <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept=".pdf,.docx" disabled={loading} />
@@ -422,7 +422,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
             <div className="flex flex-col sm:flex-row gap-4">
                 <button 
                     onClick={handleResume} 
-                    className="bg-[#00B0FF] text-white font-semibold py-2 px-8 rounded-md hover:bg-[#0099E6] transition-colors"
+                    className="bg-[#4285F4] text-white font-semibold py-2 px-8 rounded-md hover:bg-[#357ABD] transition-colors"
                 >
                     Resume
                 </button>
@@ -438,8 +438,8 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
       <div ref={chatContainerRef} className="flex-1 p-4 overflow-y-auto">
         {activeCandidate.chatHistory.map(msg => (
           <div key={msg.id} className={`flex items-start gap-3 my-4 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
-            {msg.sender === 'ai' && <BotIcon className="w-8 h-8 p-1.5 bg-[#00B0FF] text-white rounded-full flex-shrink-0" />}
-            <div className={`max-w-md p-3 rounded-lg ${msg.sender === 'user' ? 'bg-[#00B0FF] text-white' : 'bg-gray-100 text-gray-800'} whitespace-pre-wrap shadow-sm`}>
+            {msg.sender === 'ai' && <BotIcon className="w-8 h-8 p-1.5 bg-[#4285F4] text-white rounded-full flex-shrink-0" />}
+            <div className={`max-w-md p-3 rounded-lg ${msg.sender === 'user' ? 'bg-[#4285F4] text-white' : 'bg-gray-100 text-gray-800'} whitespace-pre-wrap shadow-sm`}>
                 {msg.text.includes('**') ? 
                   <div dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />') }} /> : 
                   msg.text
@@ -450,7 +450,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
         ))}
         {isLoading && activeCandidate.status !== 'Completed' && (
             <div className="flex items-start gap-3 my-4">
-                <BotIcon className="w-8 h-8 p-1.5 bg-[#00B0FF] text-white rounded-full" />
+                <BotIcon className="w-8 h-8 p-1.5 bg-[#4285F4] text-white rounded-full" />
                 <div className="max-w-md p-3 rounded-lg bg-gray-100">
                     <Loader />
                 </div>
@@ -465,7 +465,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
                 <p className="text-gray-500 mb-4">The interview has ended. You can start a new one or view results in the Interviewer tab.</p>
                 <button 
                     onClick={() => setAppState(prev => ({ ...prev, activeCandidateId: null }))} 
-                    className="bg-[#00B0FF] text-white font-semibold py-2 px-6 rounded-md hover:bg-[#0099E6] transition-colors"
+                    className="bg-[#4285F4] text-white font-semibold py-2 px-6 rounded-md hover:bg-[#357ABD] transition-colors"
                 >
                     Start New Interview
                 </button>
@@ -477,7 +477,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 placeholder="Type your answer..."
-                className="flex-1 bg-gray-100 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-[#00B0FF] focus:outline-none text-gray-900 disabled:opacity-50"
+                className="flex-1 bg-gray-100 border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-[#4285F4] focus:outline-none text-gray-900 disabled:opacity-50"
                 disabled={isLoading || isPaused}
               />
               {isInterviewInProgress && <Timer timeLeft={timeLeft} questionTime={currentQuestionTime} />}
@@ -492,7 +492,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
                     <PauseIcon className="w-5 h-5" />
                 </button>
               )}
-              <button type="submit" className="bg-[#00B0FF] p-2 rounded-lg text-white hover:bg-[#0099E6] disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={isLoading || userInput.trim() === ''}>
+              <button type="submit" className="bg-[#4285F4] p-2 rounded-lg text-white hover:bg-[#357ABD] disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={isLoading || userInput.trim() === ''}>
                 <SendIcon className="w-5 h-5" />
               </button>
             </form>
