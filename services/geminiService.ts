@@ -30,16 +30,21 @@ export const extractInfoFromResume = async (resumeText: string): Promise<{ name:
   }
 };
 
-export const generateQuestion = async (difficulty: Difficulty, existingQuestions: string[]): Promise<string> => {
+export const generateQuestion = async (difficulty: Difficulty, existingQuestions: string[]): Promise<string | null> => {
   try {
     const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: `You are an expert technical interviewer for a full stack (React/Node.js) role. Generate one interview question with ${difficulty} difficulty. The question should be a single, clear question. Do not repeat any of the following questions: ${existingQuestions.join(', ')}`,
     });
-    return response.text.trim();
+    const text = response.text.trim();
+    if (!text || text.toLowerCase().includes('error generating question')) {
+        console.error("Gemini returned an invalid question:", text);
+        return null;
+    }
+    return text;
   } catch (error) {
     console.error("Error generating question:", error);
-    return "Error generating question. Please try again.";
+    return null;
   }
 };
 

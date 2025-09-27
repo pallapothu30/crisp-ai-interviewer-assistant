@@ -53,8 +53,8 @@ function App() {
       onClick={() => setAppState(prev => ({ ...prev, activeTab: tabName }))}
       className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
         appState.activeTab === tabName
-          ? 'bg-indigo-600 text-white'
-          : 'text-slate-300 hover:bg-slate-700'
+          ? 'bg-cyan-600 text-white'
+          : 'text-gray-300 hover:bg-gray-700'
       }`}
     >
       {label}
@@ -62,16 +62,16 @@ function App() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-200 font-sans p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gray-900 text-gray-200 font-sans p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
         <header className="text-center mb-6">
           <h1 className="text-4xl font-extrabold text-white tracking-tight">
-            Crisp <span className="text-indigo-400">AI Interview Assistant</span>
+            Crisp <span className="text-cyan-400">AI Interview Assistant</span>
           </h1>
-          <p className="mt-2 text-slate-400">Your intelligent partner in technical screening</p>
+          <p className="mt-2 text-gray-400">Your intelligent partner in technical screening</p>
         </header>
         
-        <div className="bg-slate-800/50 border border-slate-700 p-2 rounded-lg mb-6 flex justify-center items-center gap-2">
+        <div className="bg-gray-800/50 border border-gray-700 p-2 rounded-lg mb-6 flex justify-center items-center gap-2">
           <TabButton tabName="interviewee" label="Interviewee" />
           <TabButton tabName="interviewer" label="Interviewer" />
         </div>
@@ -86,12 +86,12 @@ function App() {
       </div>
 
       <Modal isOpen={showWelcomeModal} onClose={() => setShowWelcomeModal(false)} title="Welcome Back!">
-        <p className="text-slate-300 mb-6">You have an interview in progress. Would you like to resume?</p>
+        <p className="text-gray-300 mb-6">You have an interview in progress. Would you like to resume?</p>
         <div className="flex justify-end gap-4">
-            <button onClick={handleDiscard} className="px-4 py-2 rounded-md bg-slate-600 hover:bg-slate-700 transition-colors">
+            <button onClick={handleDiscard} className="px-4 py-2 rounded-md bg-gray-600 hover:bg-gray-700 transition-colors">
                 Discard
             </button>
-            <button onClick={handleResume} className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 transition-colors">
+            <button onClick={handleResume} className="px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-700 transition-colors">
                 Resume
             </button>
         </div>

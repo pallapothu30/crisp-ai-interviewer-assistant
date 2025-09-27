@@ -29,12 +29,12 @@ const ResumeUpload: React.FC<{ onUpload: (file: File) => void, loading: boolean 
   };
 
   return (
-    <div className="text-center p-8 border-2 border-dashed border-slate-600 rounded-lg">
-      <UploadIcon className="mx-auto h-12 w-12 text-slate-400" />
+    <div className="text-center p-8 border-2 border-dashed border-gray-600 rounded-lg">
+      <UploadIcon className="mx-auto h-12 w-12 text-gray-400" />
       <h3 className="mt-2 text-lg font-medium text-white">Upload your resume</h3>
-      <p className="mt-1 text-sm text-slate-400">PDF or DOCX accepted</p>
+      <p className="mt-1 text-sm text-gray-400">PDF or DOCX accepted</p>
       <div className="mt-4">
-        <label htmlFor="file-upload" className="cursor-pointer bg-indigo-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-indigo-700 transition-colors">
+        <label htmlFor="file-upload" className="cursor-pointer bg-cyan-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-cyan-700 transition-colors">
           {loading ? 'Processing...' : 'Select File'}
         </label>
         <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleFileChange} accept=".pdf,.docx" disabled={loading} />
@@ -50,7 +50,7 @@ const Timer: React.FC<{ timeLeft: number; questionTime: number }> = ({ timeLeft,
     return (
         <div className="flex items-center space-x-2 text-sm font-mono">
             <svg className="w-6 h-6 transform -rotate-90" viewBox="0 0 24 24">
-                <circle className="text-slate-700" strokeWidth="4" stroke="currentColor" fill="transparent" r="8" cx="12" cy="12"/>
+                <circle className="text-gray-700" strokeWidth="4" stroke="currentColor" fill="transparent" r="8" cx="12" cy="12"/>
                 <circle className={strokeColor} strokeWidth="4" strokeDasharray="50.265" strokeDashoffset={50.265 - (progress / 100) * 50.265} stroke="currentColor" fill="transparent" r="8" cx="12" cy="12"/>
             </svg>
             <span className={`font-bold ${strokeColor}`}>{timeLeft}s</span>
@@ -65,10 +65,29 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
   const timerRef = useRef<number | null>(null);
 
   const activeCandidate = appState.candidates.find(c => c.id === appState.activeCandidateId);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  
+  // Smarter scrolling effect
+  useEffect(() => {
+    const container = chatContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+        const threshold = 100; // pixels from bottom to be considered "at bottom"
+        isAtBottomRef.current = container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
+    };
+
+    handleScroll();
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [activeCandidate]);
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isAtBottomRef.current) {
+        chatEndRef.current?.scrollIntoView();
+    }
   }, [activeCandidate?.chatHistory]);
 
   const updateCandidate = useCallback((updatedCandidate: Candidate) => {
@@ -103,13 +122,35 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
         if (currentQuestionIndex < TOTAL_QUESTIONS) {
             const { difficulty, time } = INTERVIEW_FLOW[currentQuestionIndex];
             const existingQuestionTexts = updatedCandidate.questions.map(q => q.text);
-            const questionText = await generateQuestion(difficulty, existingQuestionTexts);
             
-            const newQuestion: Question = { id: Date.now().toString(), text: questionText, difficulty, time, answer: '', score: null, feedback: '' };
-            updatedCandidate.questions.push(newQuestion);
+            let questionText: string | null = null;
+            let retries = 0;
+            const maxRetries = 2;
 
-            newMessages.push({ id: Date.now().toString(), sender: 'ai', text: `Question ${currentQuestionIndex + 1}/${TOTAL_QUESTIONS} (${difficulty}):\n\n${questionText}` });
-            setTimeLeft(time);
+            while (!questionText && retries < maxRetries) {
+                questionText = await generateQuestion(difficulty, existingQuestionTexts);
+                if (!questionText) {
+                    retries++;
+                    const retryMessage: Message = { id: Date.now().toString() + `-retry-${retries}`, sender: 'ai', text: `I'm having a little trouble thinking of a question. Let me try again...`, isInfo: true };
+                    updatedCandidate.chatHistory = [...updatedCandidate.chatHistory, retryMessage];
+                    updateCandidate(updatedCandidate); 
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+            }
+
+            if (questionText) {
+                 const newQuestion: Question = { id: Date.now().toString(), text: questionText, difficulty, time, answer: '', score: null, feedback: '' };
+                 updatedCandidate.questions.push(newQuestion);
+                 newMessages.push({ id: Date.now().toString(), sender: 'ai', text: `Question ${currentQuestionIndex + 1}/${TOTAL_QUESTIONS} (${difficulty}):\n\n${questionText}` });
+                 setTimeLeft(time);
+            } else {
+                const failureMessage: Message = { id: Date.now().toString() + '-fail', sender: 'ai', text: `I'm sorry, I'm unable to generate a new question right now. This interview cannot continue. Please start a new one later.`, isInfo: true };
+                newMessages.push(failureMessage);
+                updatedCandidate.status = 'Completed';
+                updatedCandidate.summary = "Interview terminated due to an error generating questions.";
+                updatedCandidate.finalScore = updatedCandidate.questions.length > 0 ? Math.round(updatedCandidate.questions.reduce((acc, q) => acc + (q.score || 0), 0) / TOTAL_QUESTIONS) : 0;
+            }
+
         } else {
             updatedCandidate.status = 'Completed';
             const thinkingMessage: Message = { id: 'thinking-msg', sender: 'ai', text: "Thank you for completing the interview. I'm now calculating your final score and generating a summary. One moment...", isInfo: true };
@@ -127,7 +168,6 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
             finalChatHistory.push(finalMessage);
             updatedCandidate.chatHistory = finalChatHistory;
 
-            // Perform the final state update for the candidate.
             setAppState(prev => ({
                 ...prev,
                 candidates: prev.candidates.map(c => c.id === updatedCandidate.id ? updatedCandidate : c),
@@ -147,12 +187,9 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     e.preventDefault();
     if (!activeCandidate || (userInput.trim() === '' && activeCandidate.status !== 'InProgress')) return;
     if (timerRef.current) clearTimeout(timerRef.current);
+    isAtBottomRef.current = true; // Force scroll after user submission
 
     setIsLoading(true);
-    // Fix: Using JSON.parse(JSON.stringify(...)) for a deep clone loses specific type information,
-    // like the 'ai' | 'user' union for the sender property, which TypeScript then infers as a generic string.
-    // By explicitly casting the result back to `Candidate`, we restore this type information and
-    // prevent downstream type errors when manipulating the chat history.
     const updatedCandidate: Candidate = JSON.parse(JSON.stringify(activeCandidate));
 
     if (updatedCandidate.status === 'InfoCollected') {
@@ -235,10 +272,15 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     if (newCandidate.status === 'InProgress') {
         const { difficulty, time } = INTERVIEW_FLOW[0];
         const questionText = await generateQuestion(difficulty, []);
-        const newQuestion: Question = { id: Date.now().toString() + '_qn', text: questionText, difficulty, time, answer: '', score: null, feedback: '' };
-        newCandidate.questions.push(newQuestion);
-        newMessages.push({ id: Date.now().toString() + '_qn_text', sender: 'ai', text: `Question 1/${TOTAL_QUESTIONS} (${difficulty}):\n\n${questionText}` });
-        setTimeLeft(time);
+        if (questionText) {
+            const newQuestion: Question = { id: Date.now().toString() + '_qn', text: questionText, difficulty, time, answer: '', score: null, feedback: '' };
+            newCandidate.questions.push(newQuestion);
+            newMessages.push({ id: Date.now().toString() + '_qn_text', sender: 'ai', text: `Question 1/${TOTAL_QUESTIONS} (${difficulty}):\n\n${questionText}` });
+            setTimeLeft(time);
+        } else {
+             newMessages.push({ id: Date.now().toString() + '_q_fail', sender: 'ai', text: `I'm sorry, I'm unable to generate a question to start the interview. Please try again later.`, isInfo: true });
+             newCandidate.status = 'Completed';
+        }
     }
 
     newCandidate.chatHistory.push(...newMessages);
@@ -307,24 +349,24 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
   const currentQuestionTime = isInterviewInProgress ? activeCandidate.questions[activeCandidate.currentQuestionIndex]?.time : 0;
 
   return (
-    <div className="flex flex-col h-full bg-slate-800 rounded-lg shadow-xl">
-      <div className="flex-1 p-4 overflow-y-auto">
+    <div className="flex flex-col h-full bg-gray-800 rounded-lg shadow-xl">
+      <div ref={chatContainerRef} className="flex-1 p-4 overflow-y-auto">
         {activeCandidate.chatHistory.map(msg => (
           <div key={msg.id} className={`flex items-start gap-3 my-4 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
-            {msg.sender === 'ai' && <BotIcon className="w-8 h-8 p-1.5 bg-indigo-600 text-white rounded-full flex-shrink-0" />}
-            <div className={`max-w-md p-3 rounded-lg ${msg.sender === 'user' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-200'} whitespace-pre-wrap`}>
+            {msg.sender === 'ai' && <BotIcon className="w-8 h-8 p-1.5 bg-cyan-600 text-white rounded-full flex-shrink-0" />}
+            <div className={`max-w-md p-3 rounded-lg ${msg.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-200'} whitespace-pre-wrap`}>
                 {msg.text.includes('**') ? 
                   <div dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />') }} /> : 
                   msg.text
                 }
             </div>
-            {msg.sender === 'user' && <PersonIcon className="w-8 h-8 p-1.5 bg-sky-600 text-white rounded-full flex-shrink-0" />}
+            {msg.sender === 'user' && <PersonIcon className="w-8 h-8 p-1.5 bg-blue-600 text-white rounded-full flex-shrink-0" />}
           </div>
         ))}
         {isLoading && activeCandidate.status !== 'Completed' && (
             <div className="flex items-start gap-3 my-4">
-                <BotIcon className="w-8 h-8 p-1.5 bg-indigo-600 text-white rounded-full" />
-                <div className="max-w-md p-3 rounded-lg bg-slate-700">
+                <BotIcon className="w-8 h-8 p-1.5 bg-cyan-600 text-white rounded-full" />
+                <div className="max-w-md p-3 rounded-lg bg-gray-700">
                     <Loader />
                 </div>
             </div>
@@ -332,13 +374,13 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
         <div ref={chatEndRef} />
       </div>
 
-      <div className="p-4 border-t border-slate-700">
+      <div className="p-4 border-t border-gray-700">
         {activeCandidate.status === 'Completed' ? (
             <div className="text-center">
-                <p className="text-slate-400 mb-4">The interview has ended. You can start a new one or view results in the Interviewer tab.</p>
+                <p className="text-gray-400 mb-4">The interview has ended. You can start a new one or view results in the Interviewer tab.</p>
                 <button 
                     onClick={() => setAppState(prev => ({ ...prev, activeCandidateId: null }))} 
-                    className="bg-indigo-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-indigo-700 transition-colors"
+                    className="bg-cyan-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-cyan-700 transition-colors"
                 >
                     Start New Interview
                 </button>
@@ -350,11 +392,11 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 placeholder="Type your answer..."
-                className="flex-1 bg-slate-700 border border-slate-600 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none text-white disabled:opacity-50"
+                className="flex-1 bg-gray-700 border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none text-white disabled:opacity-50"
                 disabled={isLoading}
               />
               {isInterviewInProgress && <Timer timeLeft={timeLeft} questionTime={currentQuestionTime} />}
-              <button type="submit" className="bg-indigo-600 p-2 rounded-lg text-white hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed" disabled={isLoading || userInput.trim() === ''}>
+              <button type="submit" className="bg-cyan-600 p-2 rounded-lg text-white hover:bg-cyan-700 disabled:bg-gray-600 disabled:cursor-not-allowed" disabled={isLoading || userInput.trim() === ''}>
                 <SendIcon className="w-5 h-5" />
               </button>
             </form>

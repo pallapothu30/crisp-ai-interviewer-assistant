@@ -47,19 +47,19 @@ const InterviewerDashboard: React.FC<InterviewerDashboardProps> = ({ appState })
   };
 
   return (
-    <div className="p-6 bg-slate-800 rounded-lg shadow-xl h-full flex flex-col">
-      <h1 className="text-2xl font-bold text-slate-100 mb-4">Interviewer Dashboard</h1>
+    <div className="p-6 bg-gray-800 rounded-lg shadow-xl h-full flex flex-col">
+      <h1 className="text-2xl font-bold text-gray-100 mb-4">Interviewer Dashboard</h1>
       <input
         type="text"
         placeholder="Search by name or email..."
         value={searchTerm}
         onChange={e => setSearchTerm(e.target.value)}
-        className="w-full p-2 mb-4 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+        className="w-full p-2 mb-4 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:outline-none"
       />
       <div className="flex-1 overflow-y-auto">
         <table className="w-full text-left table-auto">
-          <thead className="sticky top-0 bg-slate-800">
-            <tr className="border-b border-slate-700">
+          <thead className="sticky top-0 bg-gray-800">
+            <tr className="border-b border-gray-700">
               <th className="p-3 cursor-pointer" onClick={() => requestSort('name')}>Name {getSortIndicator('name')}</th>
               <th className="p-3 cursor-pointer" onClick={() => requestSort('email')}>Email {getSortIndicator('email')}</th>
               <th className="p-3 cursor-pointer text-center" onClick={() => requestSort('finalScore')}>Score {getSortIndicator('finalScore')}</th>
@@ -70,7 +70,7 @@ const InterviewerDashboard: React.FC<InterviewerDashboardProps> = ({ appState })
             {sortedCandidates.map(candidate => (
               <tr 
                 key={candidate.id} 
-                className="border-b border-slate-700 hover:bg-slate-700/50 cursor-pointer"
+                className="border-b border-gray-700 hover:bg-gray-700/50 cursor-pointer"
                 onClick={() => setSelectedCandidate(candidate)}
               >
                 <td className="p-3">{candidate.name || 'N/A'}</td>
@@ -80,13 +80,13 @@ const InterviewerDashboard: React.FC<InterviewerDashboardProps> = ({ appState })
                         {candidate.finalScore}%
                     </span>
                 </td>
-                <td className="p-3 text-slate-400 truncate max-w-sm">{candidate.summary}</td>
+                <td className="p-3 text-gray-400 truncate max-w-sm">{candidate.summary}</td>
               </tr>
             ))}
           </tbody>
         </table>
         {sortedCandidates.length === 0 && (
-            <div className="text-center py-10 text-slate-500">No completed interviews found.</div>
+            <div className="text-center py-10 text-gray-500">No completed interviews found.</div>
         )}
       </div>
 
@@ -94,33 +94,33 @@ const InterviewerDashboard: React.FC<InterviewerDashboardProps> = ({ appState })
         <Modal isOpen={!!selectedCandidate} onClose={() => setSelectedCandidate(null)} title={`Interview Details: ${selectedCandidate.name}`}>
           <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
             <div>
-              <h3 className="font-bold text-lg text-slate-200">Candidate Profile</h3>
-              <p className="text-slate-400"><strong>Email:</strong> {selectedCandidate.email}</p>
-              <p className="text-slate-400"><strong>Phone:</strong> {selectedCandidate.phone}</p>
+              <h3 className="font-bold text-lg text-gray-200">Candidate Profile</h3>
+              <p className="text-gray-400"><strong>Email:</strong> {selectedCandidate.email}</p>
+              <p className="text-gray-400"><strong>Phone:</strong> {selectedCandidate.phone}</p>
             </div>
             <div>
-              <h3 className="font-bold text-lg text-slate-200">Final Assessment</h3>
-              <p className="text-slate-300"><strong>Score:</strong> {selectedCandidate.finalScore}%</p>
-              <p className="text-slate-300"><strong>AI Summary:</strong> {selectedCandidate.summary}</p>
+              <h3 className="font-bold text-lg text-gray-200">Final Assessment</h3>
+              <p className="text-gray-300"><strong>Score:</strong> {selectedCandidate.finalScore}%</p>
+              <p className="text-gray-300"><strong>AI Summary:</strong> {selectedCandidate.summary}</p>
             </div>
             <div>
-              <h3 className="font-bold text-lg text-slate-200">Interview Transcript</h3>
+              <h3 className="font-bold text-lg text-gray-200">Interview Transcript</h3>
               <div className="space-y-4 mt-2">
                 {selectedCandidate.questions.map((q, index) => (
-                  <div key={q.id} className="p-3 bg-slate-700/50 rounded-lg">
+                  <div key={q.id} className="p-3 bg-gray-700/50 rounded-lg">
                     <div className="flex items-start gap-3">
-                      <BotIcon className="w-6 h-6 p-1 bg-indigo-600 rounded-full flex-shrink-0 mt-1" />
+                      <BotIcon className="w-6 h-6 p-1 bg-cyan-600 rounded-full flex-shrink-0 mt-1" />
                       <div>
-                        <p className="font-semibold text-slate-300">Q{index+1} ({q.difficulty}): {q.text}</p>
+                        <p className="font-semibold text-gray-300">Q{index+1} ({q.difficulty}): {q.text}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3 mt-2">
-                      <PersonIcon className="w-6 h-6 p-1 bg-sky-600 rounded-full flex-shrink-0 mt-1" />
+                      <PersonIcon className="w-6 h-6 p-1 bg-blue-600 rounded-full flex-shrink-0 mt-1" />
                       <div>
-                        <p className="text-slate-400 italic">{q.answer || "No answer provided."}</p>
+                        <p className="text-gray-400 italic">{q.answer || "No answer provided."}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-600/50">
+                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-600/50">
                         {q.score! >= 50 ? <CheckCircleIcon className="w-5 h-5 text-green-400"/> : <XCircleIcon className="w-5 h-5 text-red-400"/>}
                         <p className="text-sm"><strong>Score:</strong> {q.score}/100</p>
                         <p className="text-sm flex-1"><strong>Feedback:</strong> {q.feedback}</p>
