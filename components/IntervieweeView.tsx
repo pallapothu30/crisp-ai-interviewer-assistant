@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { AppState, Candidate, Message, Question } from '../types';
-import { BotIcon, PersonIcon, SendIcon, UploadIcon } from './shared/Icons';
+import { BotIcon, PersonIcon, SendIcon, UploadIcon, PauseIcon } from './shared/Icons';
 import Loader from './shared/Loader';
 import { extractInfoFromResume, generateQuestion, evaluateAnswer, summarizeInterview } from '../services/geminiService';
 import { INTERVIEW_FLOW, TOTAL_QUESTIONS } from '../constants';
@@ -62,6 +63,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
   const [isLoading, setIsLoading] = useState(false);
   const [userInput, setUserInput] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   const activeCandidate = appState.candidates.find(c => c.id === appState.activeCandidateId);
@@ -227,18 +229,33 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     await handleNextAction(updatedCandidate);
   }, [activeCandidate, userInput, handleNextAction, updateCandidate]);
 
+  const isInterviewInProgress = activeCandidate?.status === 'InProgress' && activeCandidate.currentQuestionIndex < TOTAL_QUESTIONS;
+
   // Timer logic
   useEffect(() => {
-    if (timeLeft > 0 && activeCandidate?.status === 'InProgress') {
+    if (timeLeft > 0 && isInterviewInProgress && !isPaused) {
       timerRef.current = window.setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-    } else if (timeLeft === 0 && activeCandidate?.status === 'InProgress') {
+    } else if (timeLeft === 0 && isInterviewInProgress && !isPaused) {
       const currentQuestion = activeCandidate.questions[activeCandidate.currentQuestionIndex];
       if (currentQuestion && currentQuestion.answer === '') { // Auto-submit if time runs out
           handleSubmit(new Event('submit'));
       }
     }
     return () => { if (timerRef.current) clearTimeout(timerRef.current) };
-  }, [timeLeft, activeCandidate, handleSubmit]);
+  }, [timeLeft, activeCandidate, isInterviewInProgress, handleSubmit, isPaused]);
+
+  // Page visibility logic
+  useEffect(() => {
+      const handleVisibilityChange = () => {
+          if (document.hidden && isInterviewInProgress) {
+              setIsPaused(true);
+          }
+      }
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+  }, [isInterviewInProgress]);
   
   const processResumeText = async (text: string) => {
     setIsLoading(true);
@@ -296,7 +313,6 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
 
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
-    let text = '';
     const reader = new FileReader();
 
     const processFileText = async (fileText: string) => {
@@ -341,15 +357,40 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     }
   };
   
+  const handleStartNewInterview = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setAppState(prev => ({...prev, activeCandidateId: null}));
+    setIsPaused(false);
+  }
+
   if (!activeCandidate) {
     return <div className="p-4"><ResumeUpload onUpload={handleFileUpload} loading={isLoading} /></div>;
   }
 
-  const isInterviewInProgress = activeCandidate.status === 'InProgress' && activeCandidate.currentQuestionIndex < TOTAL_QUESTIONS;
   const currentQuestionTime = isInterviewInProgress ? activeCandidate.questions[activeCandidate.currentQuestionIndex]?.time : 0;
 
   return (
-    <div className="flex flex-col h-full bg-gray-800 rounded-lg shadow-xl">
+    <div className="flex flex-col h-full bg-gray-800 rounded-lg shadow-xl relative">
+      {isPaused && (
+        <div className="absolute inset-0 bg-gray-800/80 backdrop-blur-sm z-10 flex flex-col justify-center items-center gap-6 p-4 text-center">
+            <h2 className="text-3xl font-bold text-white">Interview Paused</h2>
+            <p className="text-gray-300">Your timer is stopped. Resume when you're ready.</p>
+            <div className="flex flex-col sm:flex-row gap-4">
+                <button 
+                    onClick={() => setIsPaused(false)} 
+                    className="bg-cyan-600 text-white font-semibold py-2 px-8 rounded-md hover:bg-cyan-700 transition-colors"
+                >
+                    Resume
+                </button>
+                <button 
+                    onClick={handleStartNewInterview} 
+                    className="bg-red-600 text-white font-semibold py-2 px-8 rounded-md hover:bg-red-700 transition-colors"
+                >
+                    End & Start New
+                </button>
+            </div>
+        </div>
+      )}
       <div ref={chatContainerRef} className="flex-1 p-4 overflow-y-auto">
         {activeCandidate.chatHistory.map(msg => (
           <div key={msg.id} className={`flex items-start gap-3 my-4 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
@@ -393,9 +434,20 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
                 onChange={(e) => setUserInput(e.target.value)}
                 placeholder="Type your answer..."
                 className="flex-1 bg-gray-700 border border-gray-600 rounded-lg p-2 focus:ring-2 focus:ring-cyan-500 focus:outline-none text-white disabled:opacity-50"
-                disabled={isLoading}
+                disabled={isLoading || isPaused}
               />
               {isInterviewInProgress && <Timer timeLeft={timeLeft} questionTime={currentQuestionTime} />}
+              {isInterviewInProgress && (
+                <button
+                    type="button"
+                    onClick={() => setIsPaused(true)}
+                    className="p-2 rounded-lg text-gray-400 hover:bg-gray-700 hover:text-white disabled:opacity-50"
+                    disabled={isLoading}
+                    aria-label="Pause interview"
+                >
+                    <PauseIcon className="w-5 h-5" />
+                </button>
+              )}
               <button type="submit" className="bg-cyan-600 p-2 rounded-lg text-white hover:bg-cyan-700 disabled:bg-gray-600 disabled:cursor-not-allowed" disabled={isLoading || userInput.trim() === ''}>
                 <SendIcon className="w-5 h-5" />
               </button>
