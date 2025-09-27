@@ -194,16 +194,24 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
 
     const currentInput = userInput;
     setUserInput('');
+
+    // 1. Immediately add the user's message and update the UI.
+    const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: currentInput };
+    const candidateWithUserMessage = {
+        ...activeCandidate,
+        chatHistory: [...activeCandidate.chatHistory, userMessage]
+    };
+    updateCandidate(candidateWithUserMessage);
+
+    // Now start async processing
     setIsLoading(true);
+    let processingCandidate: Candidate = JSON.parse(JSON.stringify(candidateWithUserMessage));
 
-    let updatedCandidate: Candidate = JSON.parse(JSON.stringify(activeCandidate));
-    updatedCandidate.chatHistory.push({ id: Date.now().toString(), sender: 'user', text: currentInput });
-
-    if (updatedCandidate.status === 'InfoCollected') {
+    if (processingCandidate.status === 'InfoCollected') {
         const missingFields: string[] = [];
-        if (!updatedCandidate.name) missingFields.push('name');
-        if (!updatedCandidate.email) missingFields.push('email');
-        if (!updatedCandidate.phone) missingFields.push('phone');
+        if (!processingCandidate.name) missingFields.push('name');
+        if (!processingCandidate.email) missingFields.push('email');
+        if (!processingCandidate.phone) missingFields.push('phone');
 
         if (missingFields.length > 0) {
             const fieldToUpdate = missingFields[0] as 'name' | 'email' | 'phone';
@@ -211,34 +219,36 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
             const validation = await validateInfo(fieldToUpdate, currentInput);
             
             if (validation.isValid) {
-                (updatedCandidate[fieldToUpdate] as any) = currentInput;
+                (processingCandidate[fieldToUpdate] as any) = currentInput;
             } else {
-                updatedCandidate.chatHistory.push({ id: Date.now().toString() + '-validation', sender: 'ai', text: validation.feedback, isInfo: true });
-                updateCandidate(updatedCandidate);
+                processingCandidate.chatHistory.push({ id: Date.now().toString() + '-validation', sender: 'ai', text: validation.feedback, isInfo: true });
+                updateCandidate(processingCandidate);
                 setIsLoading(false);
                 return; // Stop processing if validation fails
             }
         }
-    } else if (updatedCandidate.status === 'InProgress') {
-        const currentQuestionIndex = updatedCandidate.currentQuestionIndex;
-        const currentQuestion = updatedCandidate.questions[currentQuestionIndex];
+    } else if (processingCandidate.status === 'InProgress') {
+        const currentQuestionIndex = processingCandidate.currentQuestionIndex;
+        const currentQuestion = processingCandidate.questions[currentQuestionIndex];
         
         currentQuestion.answer = currentInput;
         
+        // 2. Add a loader message and update the UI again.
         const loaderMessage = { id: Date.now().toString() + "-loader", sender: 'ai' as const, text: "Evaluating...", isInfo: true };
-        updatedCandidate.chatHistory.push(loaderMessage);
-        updateCandidate(updatedCandidate);
+        processingCandidate.chatHistory.push(loaderMessage);
+        updateCandidate(processingCandidate);
         
         const { score, feedback } = await evaluateAnswer(currentQuestion.text, currentInput);
         currentQuestion.score = score;
         currentQuestion.feedback = feedback;
-        updatedCandidate.currentQuestionIndex += 1;
-        updatedCandidate.chatHistory.pop(); // remove loader message
+        processingCandidate.currentQuestionIndex += 1;
         
-        updatedCandidate.chatHistory.push({ id: Date.now().toString(), sender: 'ai', text: `**Score:** ${score}/100\n**Feedback:** ${feedback}`, isInfo: true });
+        // 3. Remove loader and add result.
+        processingCandidate.chatHistory = processingCandidate.chatHistory.filter(m => m.id !== loaderMessage.id);
+        processingCandidate.chatHistory.push({ id: Date.now().toString(), sender: 'ai', text: `**Score:** ${score}/100\n**Feedback:** ${feedback}`, isInfo: true });
     }
 
-    await handleNextAction(updatedCandidate);
+    await handleNextAction(processingCandidate);
   }, [activeCandidate, userInput, handleNextAction, updateCandidate]);
 
 
@@ -462,10 +472,13 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
           <div key={msg.id} className={`flex items-start gap-3 my-4 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
             {msg.sender === 'ai' && <BotIcon className="w-8 h-8 p-1.5 bg-[#4285F4] text-white rounded-full flex-shrink-0" />}
             <div className={`max-w-md p-3 rounded-lg ${msg.sender === 'user' ? 'bg-[#4285F4] text-white' : 'bg-gray-100 text-gray-800'} whitespace-pre-wrap shadow-sm`}>
-                {msg.text.includes('**') ? 
-                  <div dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />') }} /> : 
-                  msg.text
-                }
+                {msg.isInfo ? (
+                   msg.text.includes('**') ? 
+                   <div dangerouslySetInnerHTML={{ __html: msg.text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br />') }} /> : 
+                   msg.text
+                ) : (
+                    msg.text
+                )}
             </div>
             {msg.sender === 'user' && <UserIcon className="w-8 h-8 p-1.5 bg-gray-500 text-white rounded-full flex-shrink-0" />}
           </div>
