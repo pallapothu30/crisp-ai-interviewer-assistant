@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { AppState, Candidate, Message, Question } from '../types';
 import { BotIcon, UserIcon, SendIcon, UploadIcon, PauseIcon } from './shared/Icons';
 import Loader from './shared/Loader';
-import { extractInfoFromResume, generateQuestion, evaluateAnswer, summarizeInterview } from '../services/geminiService';
+import { extractInfoFromResume, generateQuestion, evaluateAnswer, summarizeInterview, validateInfo } from '../services/geminiService';
 import { INTERVIEW_FLOW, TOTAL_QUESTIONS } from '../constants';
 
 // Declare global variables from CDN scripts
@@ -190,10 +190,14 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     e.preventDefault();
     if (!activeCandidate || (userInput.trim() === '' && activeCandidate.status !== 'InProgress')) return;
     if (timerRef.current) clearTimeout(timerRef.current);
-    isAtBottomRef.current = true; // Force scroll after user submission
+    isAtBottomRef.current = true;
 
+    const currentInput = userInput;
+    setUserInput('');
     setIsLoading(true);
-    const updatedCandidate: Candidate = JSON.parse(JSON.stringify(activeCandidate));
+
+    let updatedCandidate: Candidate = JSON.parse(JSON.stringify(activeCandidate));
+    updatedCandidate.chatHistory.push({ id: Date.now().toString(), sender: 'user', text: currentInput });
 
     if (updatedCandidate.status === 'InfoCollected') {
         const missingFields: string[] = [];
@@ -202,22 +206,30 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
         if (!updatedCandidate.phone) missingFields.push('phone');
 
         if (missingFields.length > 0) {
-            const fieldToUpdate = missingFields[0] as keyof Candidate;
-            (updatedCandidate[fieldToUpdate] as any) = userInput;
+            const fieldToUpdate = missingFields[0] as 'name' | 'email' | 'phone';
+            
+            const validation = await validateInfo(fieldToUpdate, currentInput);
+            
+            if (validation.isValid) {
+                (updatedCandidate[fieldToUpdate] as any) = currentInput;
+            } else {
+                updatedCandidate.chatHistory.push({ id: Date.now().toString() + '-validation', sender: 'ai', text: validation.feedback, isInfo: true });
+                updateCandidate(updatedCandidate);
+                setIsLoading(false);
+                return; // Stop processing if validation fails
+            }
         }
-        updatedCandidate.chatHistory.push({ id: Date.now().toString(), sender: 'user', text: userInput });
     } else if (updatedCandidate.status === 'InProgress') {
         const currentQuestionIndex = updatedCandidate.currentQuestionIndex;
         const currentQuestion = updatedCandidate.questions[currentQuestionIndex];
         
-        updatedCandidate.chatHistory.push({ id: Date.now().toString(), sender: 'user', text: userInput });
-        currentQuestion.answer = userInput;
+        currentQuestion.answer = currentInput;
         
         const loaderMessage = { id: Date.now().toString() + "-loader", sender: 'ai' as const, text: "Evaluating...", isInfo: true };
         updatedCandidate.chatHistory.push(loaderMessage);
         updateCandidate(updatedCandidate);
         
-        const { score, feedback } = await evaluateAnswer(currentQuestion.text, userInput);
+        const { score, feedback } = await evaluateAnswer(currentQuestion.text, currentInput);
         currentQuestion.score = score;
         currentQuestion.feedback = feedback;
         updatedCandidate.currentQuestionIndex += 1;
@@ -226,9 +238,9 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
         updatedCandidate.chatHistory.push({ id: Date.now().toString(), sender: 'ai', text: `**Score:** ${score}/100\n**Feedback:** ${feedback}`, isInfo: true });
     }
 
-    setUserInput('');
     await handleNextAction(updatedCandidate);
   }, [activeCandidate, userInput, handleNextAction, updateCandidate]);
+
 
   const isInterviewInProgress = activeCandidate?.status === 'InProgress' && activeCandidate.currentQuestionIndex < TOTAL_QUESTIONS;
 

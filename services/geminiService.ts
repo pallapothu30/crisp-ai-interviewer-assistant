@@ -30,6 +30,46 @@ export const extractInfoFromResume = async (resumeText: string): Promise<{ name:
   }
 };
 
+export const validateInfo = async (field: 'name' | 'email' | 'phone', value: string): Promise<{ isValid: boolean; feedback: string }> => {
+  if (!value || value.trim().length < 2) {
+      return { isValid: false, feedback: `Please provide a valid ${field}.` };
+  }
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `You are a data validation expert. The user was asked for their ${field}. They provided the following value: "${value}". Is this a plausible, valid ${field}? Respond ONLY with a valid JSON object with the keys "isValid" (boolean) and "feedback" (string, if invalid, explain briefly why and ask them to provide it again. e.g., "This does not appear to be a valid email address. Please provide a valid email.").`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isValid: { type: Type.BOOLEAN, description: `Is the value a valid ${field}?` },
+            feedback: { type: Type.STRING, description: "Feedback for the user" },
+          },
+          required: ["isValid", "feedback"],
+        },
+      },
+    });
+    const jsonText = response.text.trim();
+    return JSON.parse(jsonText);
+  } catch (error) {
+    console.error(`Error validating ${field}:`, error);
+    // Fallback to a simple regex check in case of API failure
+    let isValid = false;
+    if (field === 'email') {
+        isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+    } else if (field === 'phone') {
+        isValid = /^[+]*[(]{0,1}[0-9]{1,4}[)]{0,1}[-\s\./0-9]*$/.test(value);
+    } else { // name
+        isValid = value.trim().includes(' ') && value.trim().length > 3; // a very basic check for a full name
+    }
+    return { 
+        isValid, 
+        feedback: isValid ? '' : `That does not appear to be a valid ${field}. Please try again.`
+    };
+  }
+};
+
 export const generateQuestion = async (difficulty: Difficulty, existingQuestions: string[]): Promise<string | null> => {
   try {
     const response = await ai.models.generateContent({
