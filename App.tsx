@@ -86,12 +86,12 @@ function App() {
       </div>
 
       <Modal isOpen={showWelcomeModal} onClose={() => setShowWelcomeModal(false)} title="Welcome Back!">
-        <p className="text-gray-300 mb-6">You have an interview in progress. Would you like to resume?</p>
+        <p className="text-gray-600 mb-6">You have an interview in progress. Would you like to resume?</p>
         <div className="flex justify-end gap-4">
-            <button onClick={handleDiscard} className="px-4 py-2 rounded-md bg-gray-600 hover:bg-gray-700 transition-colors">
+            <button onClick={handleDiscard} className="px-4 py-2 rounded-md bg-gray-200 text-gray-800 font-semibold hover:bg-gray-300 transition-colors">
                 Discard
             </button>
-            <button onClick={handleResume} className="px-4 py-2 rounded-md bg-cyan-600 hover:bg-cyan-700 transition-colors">
+            <button onClick={handleResume} className="px-4 py-2 rounded-md bg-cyan-600 text-white font-semibold hover:bg-cyan-700 transition-colors">
                 Resume
             </button>
         </div>

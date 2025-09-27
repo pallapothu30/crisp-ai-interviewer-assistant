@@ -91,39 +91,41 @@ const InterviewerDashboard: React.FC<InterviewerDashboardProps> = ({ appState })
       </div>
 
       {selectedCandidate && (
-        <Modal isOpen={!!selectedCandidate} onClose={() => setSelectedCandidate(null)} title={`Interview Details: ${selectedCandidate.name}`}>
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
+        <Modal isOpen={!!selectedCandidate} onClose={() => setSelectedCandidate(null)} title={`Interview Details: ${selectedCandidate.name}`} size="3xl">
+          <div className="space-y-6">
             <div>
-              <h3 className="font-bold text-lg text-gray-200">Candidate Profile</h3>
-              <p className="text-gray-400"><strong>Email:</strong> {selectedCandidate.email}</p>
-              <p className="text-gray-400"><strong>Phone:</strong> {selectedCandidate.phone}</p>
+              <h3 className="font-bold text-lg text-gray-800 border-b pb-2 mb-2">Candidate Profile</h3>
+              <p className="text-gray-600"><strong>Email:</strong> {selectedCandidate.email}</p>
+              <p className="text-gray-600"><strong>Phone:</strong> {selectedCandidate.phone}</p>
+            </div>
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <h3 className="font-bold text-lg text-gray-800 mb-2">Final Assessment</h3>
+              <p className="text-gray-700">
+                <strong>Score:</strong> <span className="font-bold text-cyan-700">{selectedCandidate.finalScore}%</span>
+              </p>
+              <p className="text-gray-700 mt-1 whitespace-pre-wrap"><strong>AI Summary:</strong> {selectedCandidate.summary}</p>
             </div>
             <div>
-              <h3 className="font-bold text-lg text-gray-200">Final Assessment</h3>
-              <p className="text-gray-300"><strong>Score:</strong> {selectedCandidate.finalScore}%</p>
-              <p className="text-gray-300"><strong>AI Summary:</strong> {selectedCandidate.summary}</p>
-            </div>
-            <div>
-              <h3 className="font-bold text-lg text-gray-200">Interview Transcript</h3>
-              <div className="space-y-4 mt-2">
+              <h3 className="font-bold text-lg text-gray-800 border-b pb-2 mb-2">Interview Transcript</h3>
+              <div className="space-y-4 mt-4">
                 {selectedCandidate.questions.map((q, index) => (
-                  <div key={q.id} className="p-3 bg-gray-700/50 rounded-lg">
+                  <div key={q.id} className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
                     <div className="flex items-start gap-3">
-                      <BotIcon className="w-6 h-6 p-1 bg-cyan-600 rounded-full flex-shrink-0 mt-1" />
+                      <BotIcon className="w-6 h-6 p-1 bg-cyan-600 text-white rounded-full flex-shrink-0 mt-1" />
                       <div>
-                        <p className="font-semibold text-gray-300">Q{index+1} ({q.difficulty}): {q.text}</p>
+                        <p className="font-semibold text-gray-700">Q{index+1} ({q.difficulty}): {q.text}</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3 mt-2">
-                      <PersonIcon className="w-6 h-6 p-1 bg-blue-600 rounded-full flex-shrink-0 mt-1" />
+                    <div className="flex items-start gap-3 mt-3 pl-9">
+                      <PersonIcon className="w-6 h-6 p-1 bg-blue-600 text-white rounded-full flex-shrink-0 mt-1" />
                       <div>
-                        <p className="text-gray-400 italic">{q.answer || "No answer provided."}</p>
+                        <p className="text-gray-600 italic">{q.answer || "No answer provided."}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-600/50">
-                        {q.score! >= 50 ? <CheckCircleIcon className="w-5 h-5 text-green-400"/> : <XCircleIcon className="w-5 h-5 text-red-400"/>}
-                        <p className="text-sm"><strong>Score:</strong> {q.score}/100</p>
-                        <p className="text-sm flex-1"><strong>Feedback:</strong> {q.feedback}</p>
+                    <div className="mt-4 pt-3 border-t border-gray-200 flex items-center gap-4 text-sm text-gray-600">
+                        {q.score! >= 50 ? <CheckCircleIcon className="w-5 h-5 text-green-500"/> : <XCircleIcon className="w-5 h-5 text-red-500"/>}
+                        <p><strong>Score:</strong> {q.score}/100</p>
+                        <p className="flex-1"><strong>Feedback:</strong> {q.feedback}</p>
                     </div>
                   </div>
                 ))}

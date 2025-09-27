@@ -248,6 +248,9 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
   useEffect(() => {
       const handleVisibilityChange = () => {
           if (document.hidden && isInterviewInProgress) {
+              if (timerRef.current) {
+                  clearTimeout(timerRef.current);
+              }
               setIsPaused(true);
           }
       }
@@ -359,9 +362,50 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
   
   const handleStartNewInterview = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    setAppState(prev => ({...prev, activeCandidateId: null}));
+
+    if (activeCandidate) {
+        const updatedCandidate = { ...activeCandidate };
+        updatedCandidate.status = 'Completed';
+        updatedCandidate.summary = "Interview ended prematurely by the user.";
+        
+        const answeredQuestions = updatedCandidate.questions.filter(q => q.score !== null);
+        if (answeredQuestions.length > 0) {
+            const totalScore = answeredQuestions.reduce((acc, q) => acc + (q.score || 0), 0);
+            updatedCandidate.finalScore = Math.round(totalScore / TOTAL_QUESTIONS);
+        } else {
+            updatedCandidate.finalScore = 0;
+        }
+        
+        setAppState(prev => ({
+            ...prev,
+            candidates: prev.candidates.map(c => c.id === updatedCandidate.id ? updatedCandidate : c),
+            activeCandidateId: null
+        }));
+    } else {
+        setAppState(prev => ({ ...prev, activeCandidateId: null }));
+    }
+    
     setIsPaused(false);
-  }
+  };
+
+  const handleResume = () => {
+    if (!activeCandidate) return;
+
+    const resumeMessage: Message = {
+        id: Date.now().toString(),
+        sender: 'ai',
+        text: "Welcome back! The timer has resumed. You can continue with your answer.",
+        isInfo: true
+    };
+
+    const updatedCandidate: Candidate = {
+        ...activeCandidate,
+        chatHistory: [...activeCandidate.chatHistory, resumeMessage]
+    };
+
+    updateCandidate(updatedCandidate);
+    setIsPaused(false);
+  };
 
   if (!activeCandidate) {
     return <div className="p-4"><ResumeUpload onUpload={handleFileUpload} loading={isLoading} /></div>;
@@ -377,7 +421,7 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
             <p className="text-gray-300">Your timer is stopped. Resume when you're ready.</p>
             <div className="flex flex-col sm:flex-row gap-4">
                 <button 
-                    onClick={() => setIsPaused(false)} 
+                    onClick={handleResume} 
                     className="bg-cyan-600 text-white font-semibold py-2 px-8 rounded-md hover:bg-cyan-700 transition-colors"
                 >
                     Resume
