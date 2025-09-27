@@ -67,7 +67,7 @@ const InterviewerDashboard: React.FC<InterviewerDashboardProps> = ({ appState })
   const SortButton: React.FC<{ sortKey: SortKey, label: string }> = ({ sortKey, label }) => (
     <button
       onClick={() => setActiveSort(sortKey)}
-      className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeSort === sortKey ? 'bg-sky-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+      className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors ${activeSort === sortKey ? 'bg-[#00B0FF] text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
     >
       {label}
     </button>
@@ -98,7 +98,7 @@ const InterviewerDashboard: React.FC<InterviewerDashboardProps> = ({ appState })
                         placeholder="Search candidates..."
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
-                        className="w-full p-2 pl-10 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 focus:outline-none"
+                        className="w-full p-2 pl-10 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00B0FF] focus:outline-none"
                     />
                 </div>
                 <div className="flex items-center gap-2">
@@ -136,7 +136,7 @@ const InterviewerDashboard: React.FC<InterviewerDashboardProps> = ({ appState })
                             </td>
                             <td className="p-3 text-gray-600">{new Date(parseInt(candidate.id.split('_')[1])).toLocaleDateString()}</td>
                             <td className="p-3">
-                                <button onClick={() => setSelectedCandidate(candidate)} className="text-sky-600 hover:text-sky-800 font-semibold">View Details</button>
+                                <button onClick={() => setSelectedCandidate(candidate)} className="text-[#00B0FF] hover:text-[#0099E6] font-semibold">View Details</button>
                             </td>
                         </tr>
                         ))}
@@ -162,7 +162,7 @@ const InterviewerDashboard: React.FC<InterviewerDashboardProps> = ({ appState })
             <div className="p-4 bg-gray-50 rounded-lg">
               <h3 className="font-bold text-lg text-gray-800 mb-2">Final Assessment</h3>
               <p className="text-gray-700">
-                <strong>Score:</strong> <span className="font-bold text-sky-700">{selectedCandidate.finalScore}%</span>
+                <strong>Score:</strong> <span className="font-bold text-[#00B0FF]">{selectedCandidate.finalScore}%</span>
               </p>
               <p className="text-gray-700 mt-1 whitespace-pre-wrap"><strong>AI Summary:</strong> {selectedCandidate.summary}</p>
             </div>
@@ -172,7 +172,7 @@ const InterviewerDashboard: React.FC<InterviewerDashboardProps> = ({ appState })
                 {selectedCandidate.questions.map((q, index) => (
                   <div key={q.id} className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm">
                     <div className="flex items-start gap-3">
-                      <BotIcon className="w-6 h-6 p-1 bg-sky-500 text-white rounded-full flex-shrink-0 mt-1" />
+                      <BotIcon className="w-6 h-6 p-1 bg-[#00B0FF] text-white rounded-full flex-shrink-0 mt-1" />
                       <div>
                         <p className="font-semibold text-gray-700">Q{index+1} ({q.difficulty}): {q.text}</p>
                       </div>
