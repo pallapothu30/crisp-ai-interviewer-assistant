@@ -6,6 +6,7 @@ import IntervieweeView from './components/IntervieweeView';
 import InterviewerDashboard from './components/InterviewerDashboard';
 import Modal from './components/shared/Modal';
 import { BotIcon, UserIcon } from './components/shared/Icons';
+import { TOTAL_QUESTIONS } from './constants';
 
 const initialAppState: AppState = {
   candidates: [],
@@ -39,10 +40,21 @@ function App() {
   const handleDiscard = () => {
     const unfinishedCandidate = appState.candidates.find(c => c.status === 'InProgress');
     if (unfinishedCandidate) {
-        // Reset the candidate by removing them, or resetting their progress
+        const updatedCandidate = { ...unfinishedCandidate };
+        updatedCandidate.status = 'Completed';
+        updatedCandidate.summary = "Interview session was discarded by the user.";
+        
+        const answeredQuestions = updatedCandidate.questions.filter(q => q.score !== null);
+        if (answeredQuestions.length > 0) {
+            const totalScore = answeredQuestions.reduce((acc, q) => acc + (q.score || 0), 0);
+            updatedCandidate.finalScore = Math.round(totalScore / TOTAL_QUESTIONS);
+        } else {
+            updatedCandidate.finalScore = 0;
+        }
+        
         setAppState(prev => ({
             ...prev,
-            candidates: prev.candidates.filter(c => c.id !== unfinishedCandidate.id),
+            candidates: prev.candidates.map(c => c.id === updatedCandidate.id ? updatedCandidate : c),
             activeCandidateId: null
         }));
     }
