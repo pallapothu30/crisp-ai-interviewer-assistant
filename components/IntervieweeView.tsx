@@ -13,6 +13,7 @@ declare var mammoth: any;
 interface IntervieweeViewProps {
   appState: AppState;
   setAppState: React.Dispatch<React.SetStateAction<AppState>>;
+  isActive: boolean;
 }
 
 const ResumeUpload: React.FC<{ onUpload: (file: File) => void, loading: boolean }> = ({ onUpload, loading }) => {
@@ -59,7 +60,7 @@ const Timer: React.FC<{ timeLeft: number; questionTime: number }> = ({ timeLeft,
     );
 };
 
-const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState }) => {
+const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState, isActive }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [userInput, setUserInput] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
@@ -244,21 +245,30 @@ const IntervieweeView: React.FC<IntervieweeViewProps> = ({ appState, setAppState
     return () => { if (timerRef.current) clearTimeout(timerRef.current) };
   }, [timeLeft, activeCandidate, isInterviewInProgress, handleSubmit, isPaused]);
 
-  // Page visibility logic
+  // Page visibility & tab switching logic
   useEffect(() => {
       const handleVisibilityChange = () => {
-          if (document.hidden && isInterviewInProgress) {
+          if (document.hidden && isInterviewInProgress && !isPaused) {
               if (timerRef.current) {
                   clearTimeout(timerRef.current);
               }
               setIsPaused(true);
           }
       }
+
+      // Automatically pause if the tab is no longer active
+      if (!isActive && isInterviewInProgress && !isPaused) {
+          if (timerRef.current) {
+              clearTimeout(timerRef.current);
+          }
+          setIsPaused(true);
+      }
+
       document.addEventListener('visibilitychange', handleVisibilityChange);
       return () => {
           document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
-  }, [isInterviewInProgress]);
+  }, [isInterviewInProgress, isActive, isPaused]);
   
   const processResumeText = async (text: string) => {
     setIsLoading(true);

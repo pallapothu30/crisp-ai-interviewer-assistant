@@ -79,11 +79,16 @@ function App() {
         </div>
         
         <main className="min-h-[600px]">
-          {appState.activeTab === 'interviewee' ? (
-            <IntervieweeView appState={appState} setAppState={setAppState} />
-          ) : (
+          <div style={{ display: appState.activeTab === 'interviewee' ? 'block' : 'none' }}>
+            <IntervieweeView 
+              appState={appState} 
+              setAppState={setAppState} 
+              isActive={appState.activeTab === 'interviewee'}
+            />
+          </div>
+          <div style={{ display: appState.activeTab === 'interviewer' ? 'block' : 'none' }}>
             <InterviewerDashboard appState={appState} />
-          )}
+          </div>
         </main>
       </div>
 
