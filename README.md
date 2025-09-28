@@ -28,23 +28,28 @@ Crisp acts as an intelligent partner for both hiring managers and candidates:
 *   💾 **Local Data Persistence:** All candidate and interview data is stored securely in the browser's `localStorage`. No backend or database is required.
 *   ↩️ **Session Resumption:** If a candidate closes the tab or their browser crashes, they can seamlessly resume an interview in progress.
 
-## How to Set Up
 
-This is a frontend-only application that runs entirely in the browser.
 
-1.  **Get a Gemini API Key:**
-    *   The application uses the Google Gemini API for its AI capabilities.
-    *   You need to obtain an API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
+## Project Architecture
+![alt text](image.png)
 
-2.  **Set Up Environment Variable:**
-    *   The application is configured to read the API key from `process.env.API_KEY`.
-    *   **Important:** Since this project is provided as a set of static files, there's no build process to inject environment variables. For local testing, you may need to temporarily replace `process.env.API_KEY` in `services/geminiService.ts` with your actual key string. Remember to **never** commit API keys directly into your code.
 
-3.  **Run the Application:**
-    *   Serve the `index.html` file using a local web server. If you have Node.js, you can use a simple package like `http-server`:
-        ```bash
-        npx http-server .
-        ```
-    *   Open your browser and navigate to the local server's address (e.g., `http://localhost:8080`).
+
+## Quickstart (dev)
+1. Install deps:
+   npm install
+2. Run dev server:
+   npm run dev
+3. Open the app at: http://localhost:3000
+
+Environment / API key
+- The app uses the Google Gemini SDK. Provide your Gemini API key via environment during local development.
+- For the local dev server (Vite), the key is wired through `process.env.API_KEY` in the config. Do not commit secrets to source control.
+
+Security & privacy
+- All candidate data (resumes, chat history, scores) is persisted in browser localStorage only.
+- Do not use real candidate PII or production data while experimenting with public AI keys.
+
+
 
 That's it! You can now start using the AI Interview Assistant.
